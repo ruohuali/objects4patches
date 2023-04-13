@@ -2,16 +2,10 @@ import torch, torchvision
 from torchvision.io import read_image
 import torch.nn.functional as F
 from models import ViTBackbone, preprocess
-
 from PIL import Image
 import matplotlib.pyplot as plt
 
-def cosineSimilarity(features, temperature=0.07, softmax=False):
-    features = F.normalize(features, dim=2)
-    similarity_matrix = torch.matmul(features, features.permute(0, 2, 1)) / temperature
-    if softmax:
-        similarity_matrix = F.softmax(similarity_matrix, dim=1)
-    return similarity_matrix
+from loss import cosineSimilarity
 
 def getVisualizableTransformedImage(image_path, transforms):
     image = Image.open(image_path)
@@ -51,7 +45,7 @@ if __name__ == '__main__':
     batch = preprocess([image1], weights.transforms())
 
     features = model(batch, feature_extraction=True)
-    similarity_matrix = cosineSimilarity(features, softmax=True, temperature=1)
+    similarity_matrix = cosineSimilarity(features.squeeze(), softmax=True, temperature=1)
     image = getVisualizableTransformedImage(image_path, model.vit_weights.transforms())
     with torch.no_grad():
         for i in range(180):
