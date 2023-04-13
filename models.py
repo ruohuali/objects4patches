@@ -18,22 +18,10 @@ def preprocess(images, model_preprocess):
         batch = batch.unsqueeze(0)    
     return batch
 
-def inference(model, batch, class_names, topk=3):
-    model.eval()
-    logits = model(batch, feature_extraction=False)
-    predictions = logits.softmax(dim=1)
-    for prediction in predictions:
-        topk_ids = torch.topk(prediction, topk).indices
-        for idx in topk_ids:
-            score = prediction[idx].item()
-            category_name = class_names[idx]
-            print(f"{category_name}: {100 * score:.1f}%")
-        print('-' * 50)
-
 class ViTBackbone(nn.Module):
     def __init__(self, pretrained=False):
         super().__init__()
-        self.vit, self.vit_weights = getViTModel(pretrained=pretrained)
+        self.vit, self.vit_weights = getViTModel(pretrained=pretrained)  
 
     def forward(self, x, feature_extraction=True):
         # Reshape and permute the input tensor
@@ -52,6 +40,22 @@ class ViTBackbone(nn.Module):
         x = self.vit.heads(x)
         return x
 
+    def inference(self, images, topk=3, visualization=True):
+        self.vit.eval()
+        batch = preprocess(images, self.vit_weights.transforms())
+        with torch.no_grad():
+            logits = self.forward(batch, feature_extraction=False)
+        predictions = logits.softmax(dim=1)
+        if visualization:
+            for prediction in predictions:
+                topk_ids = torch.topk(prediction, topk).indices
+                for idx in topk_ids:
+                    score = prediction[idx].item()
+                    category_name = weights.meta["categories"][idx]
+                    print(f"{category_name}: {100 * score:.1f}%")
+                print('-' * 50) 
+        return predictions
+
 if __name__ == '__main__':
     # model, weights = getViTModel()
     model = ViTBackbone(pretrained=True)
@@ -59,5 +63,6 @@ if __name__ == '__main__':
     image1 = read_image('dog.jpg')
     image2 = read_image('cat.jpg')
     image3 = read_image('car.jpg')
-    batch = preprocess([image1, image2, image3], weights.transforms())
-    inference(model, batch, weights.meta["categories"])
+    # batch = preprocess(, weights.transforms())
+    images = [image1, image2, image3]
+    model.inference(images)
