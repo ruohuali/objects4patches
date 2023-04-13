@@ -30,10 +30,6 @@ def inference(model, batch, class_names, topk=3):
             print(f"{category_name}: {100 * score:.1f}%")
         print('-' * 50)
 
-def experiment(model, batch):
-    features = model(batch, feature_extraction=True)
-    print('feature shape', features.size())
-
 class ViTBackbone(nn.Module):
     def __init__(self, pretrained=False):
         super().__init__()
@@ -64,5 +60,4 @@ if __name__ == '__main__':
     image2 = read_image('cat.jpg')
     image3 = read_image('car.jpg')
     batch = preprocess([image1, image2, image3], weights.transforms())
-    # inference(model, batch, weights.meta["categories"])
-    experiment(model, batch)
+    inference(model, batch, weights.meta["categories"])

@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 def cosineSimilarity(features, temperature=0.07, softmax=False, mask=None):
-    # features = F.normalize(features, dim=1)
     similarity_matrix = torch.matmul(features, features.T) / temperature
     if softmax:
         if mask is not None:

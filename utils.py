@@ -5,7 +5,7 @@ from models import ViTBackbone, preprocess
 from PIL import Image
 import matplotlib.pyplot as plt
 
-from loss import cosineSimilarity
+from losses import cosineSimilarity
 
 def getVisualizableTransformedImage(image_path, transforms):
     image = Image.open(image_path)
@@ -13,6 +13,7 @@ def getVisualizableTransformedImage(image_path, transforms):
     image = image.permute(1, 2, 0)
     image += abs(image.min())
     image /= image.max()    
+    image = (image * 255).to(torch.uint8)
     return image
 
 def visualizePatchSimilarities(image, similarity_matrix, patch_idx):
@@ -40,11 +41,12 @@ if __name__ == '__main__':
     print(model.vit_weights.transforms())
     model.eval()
     vit, weights = model.vit, model.vit_weights
-    image_path = 'dog.jpg'
+    image_path = 'cat.jpg'
     image1 = read_image(image_path)
     batch = preprocess([image1], weights.transforms())
 
     features = model(batch, feature_extraction=True)
+    features = F.normalize(features, dim=1)
     similarity_matrix = cosineSimilarity(features.squeeze(), softmax=True, temperature=1)
     image = getVisualizableTransformedImage(image_path, model.vit_weights.transforms())
     with torch.no_grad():
