@@ -33,8 +33,24 @@ def visualizePatchSimilarities(image, similarity_matrix, patch_idx):
     axes[1].set_title(f'patch_similarities')
     axes[2].imshow(patch_idx_plot)
     axes[2].set_title(f'patch_idx_plot')    
-    plt.savefig(f'images/{patch_idx}.jpg') 
-    # plt.show()
+    # plt.savefig(f'images/{patch_idx}.jpg') 
+    plt.show()
+
+def visualizeLabels(images, labels, features_shape):
+    B, P2, D = features_shape
+    row_num = int(P2**(1 / 2))
+    labels = labels.view(B, P2)
+    for image, label in zip(images, labels):
+        label = label.view(row_num, row_num)
+        image = image.permute(1, 2, 0)
+        print(f'class id {label.unique()}')
+
+        fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+        axes[0].imshow(image)
+        axes[0].set_title('image')
+        axes[1].imshow(label)
+        axes[1].set_title(f'label')
+        plt.show()
 
 if __name__ == '__main__':
     model = ViTBackbone(pretrained=True)

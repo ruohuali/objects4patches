@@ -23,7 +23,9 @@ class ViTBackbone(nn.Module):
         super().__init__()
         self.vit, self.vit_weights = getViTModel(pretrained=pretrained)  
 
-    def forward(self, x, feature_extraction=True):
+    def forward(self, images, feature_extraction=True):
+        x = preprocess(images, self.vit_weights.transforms())
+
         # Reshape and permute the input tensor
         x = self.vit._process_input(x)
         n = x.shape[0]
@@ -42,9 +44,8 @@ class ViTBackbone(nn.Module):
 
     def inference(self, images, topk=3, visualization=True):
         self.vit.eval()
-        batch = preprocess(images, self.vit_weights.transforms())
         with torch.no_grad():
-            logits = self.forward(batch, feature_extraction=False)
+            logits = self.forward(images, feature_extraction=False)
         predictions = logits.softmax(dim=1)
         if visualization:
             for prediction in predictions:
@@ -57,12 +58,10 @@ class ViTBackbone(nn.Module):
         return predictions
 
 if __name__ == '__main__':
-    # model, weights = getViTModel()
     model = ViTBackbone(pretrained=True)
     vit, weights = model.vit, model.vit_weights
     image1 = read_image('dog.jpg')
     image2 = read_image('cat.jpg')
     image3 = read_image('car.jpg')
-    # batch = preprocess(, weights.transforms())
     images = [image1, image2, image3]
     model.inference(images)
