@@ -33,8 +33,8 @@ def visualizePatchSimilarities(image, similarity_matrix, patch_idx):
     axes[1].set_title(f'patch_similarities')
     axes[2].imshow(patch_idx_plot)
     axes[2].set_title(f'patch_idx_plot')    
-    # plt.savefig(f'images/{patch_idx}.jpg') 
-    plt.show()
+    plt.savefig(f'images/{patch_idx}.jpg') 
+    # plt.show()
 
 def visualizeLabels(images, labels, features_shape):
     B, P2, D = features_shape
@@ -57,7 +57,7 @@ if __name__ == '__main__':
     print(model.vit_weights.transforms())
     model.eval()
     vit, weights = model.vit, model.vit_weights
-    image_path = 'cat.jpg'
+    image_path = 'example_images/voc_example3.jpg'
     image1 = read_image(image_path)
     batch = preprocess([image1], weights.transforms())
 

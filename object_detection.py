@@ -38,7 +38,7 @@ class ObjectDetection(nn.Module):
         return predictions
 
 if __name__ == '__main__':
-    image_paths = ['coco_example1.jpg', 'coco_example2.jpg', 'cat.jpg']
+    image_paths = ['example_images/voc_example1.jpg', 'example_images/voc_example2.jpg', 'example_images/voc_example3.jpg']
     images = []
     vit_weights = ViT_B_16_Weights.DEFAULT
     for image_path in image_paths:
