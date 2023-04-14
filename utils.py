@@ -7,13 +7,17 @@ import matplotlib.pyplot as plt
 
 from losses import cosineSimilarity
 
-def getVisualizableTransformedImage(image_path, transforms):
-    image = Image.open(image_path)
-    image = transforms(image)
-    image = image.permute(1, 2, 0)
+def recoverTransformedImage(transformed_image):
+    image = transformed_image.permute(1, 2, 0)
     image += abs(image.min())
     image /= image.max()    
     image = (image * 255).to(torch.uint8)
+    return image
+
+def getVisualizableTransformedImage(image_path, transforms):
+    image = Image.open(image_path)
+    image = transforms(image)
+    image = recoverTransformedImage(image)
     return image
 
 def visualizePatchSimilarities(image, similarity_matrix, patch_idx):
