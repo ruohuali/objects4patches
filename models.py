@@ -52,16 +52,10 @@ class ViTBackbone(nn.Module):
                 topk_ids = torch.topk(prediction, topk).indices
                 for idx in topk_ids:
                     score = prediction[idx].item()
-                    category_name = weights.meta["categories"][idx]
+                    category_name = self.vit_weights.meta["categories"][idx]
                     print(f"{category_name}: {100 * score:.1f}%")
                 print('-' * 50) 
         return predictions
 
 if __name__ == '__main__':
-    model = ViTBackbone(pretrained=True)
-    vit, weights = model.vit, model.vit_weights
-    image1 = read_image('dog.jpg')
-    image2 = read_image('cat.jpg')
-    image3 = read_image('car.jpg')
-    images = [image1, image2, image3]
-    model.inference(images)
+    pass

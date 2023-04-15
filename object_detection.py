@@ -5,9 +5,10 @@ from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2, FasterRCNN_
 from torchvision.models import vit_b_16, ViT_B_16_Weights
 from torchvision.utils import draw_bounding_boxes
 from torchvision.transforms.functional import to_pil_image
+from PIL import Image
 import time
 
-from utils import getVisualizableTransformedImage
+from utils import getVisualizableTransformedImageFromPIL, HWC2CHW
 from models import preprocess
 
 def getObjectDetectionModel():
@@ -42,8 +43,9 @@ if __name__ == '__main__':
     images = []
     vit_weights = ViT_B_16_Weights.DEFAULT
     for image_path in image_paths:
-        image = getVisualizableTransformedImage(image_path, vit_weights.transforms())
-        image = image.permute(2, 0, 1)
+        image = Image.open(image_path)
+        image = getVisualizableTransformedImageFromPIL(image, vit_weights.transforms())        
+        image = HWC2CHW(image)
         images.append(image)
 
     object_detection = ObjectDetection()

@@ -2,7 +2,7 @@ import torch
 
 from object_detection import ObjectDetection
 from models import ViTBackbone
-from utils import getVisualizableTransformedImage, visualizeLabels
+from utils import getVisualizableTransformedImageFromPIL, visualizeLabels
 
 def pixelIdx2PatchIdx(pixel_idx, patch_size):
     '''
@@ -60,7 +60,7 @@ if __name__ == '__main__':
     model = ViTBackbone(pretrained=True)
     
     for image_path in image_paths:
-        image = getVisualizableTransformedImage(image_path, model.vit_weights.transforms())
+        image = getVisualizableTransformedImageFromPIL(image_path, model.vit_weights.transforms())
         image = image.permute(2, 0, 1)
         images.append(image)
 

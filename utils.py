@@ -1,21 +1,32 @@
 import torch, torchvision
 from torchvision.io import read_image
 import torch.nn.functional as F
+import torchvision.transforms.functional as TF
 from models import ViTBackbone, preprocess
 from PIL import Image
 import matplotlib.pyplot as plt
 
 from losses import cosineSimilarity
 
+def CHW2HWC(image):
+    return image.permute(1, 2, 0)
+
+def HWC2CHW(image):
+    return image.permute(2, 0, 1)
+
 def recoverTransformedImage(transformed_image):
-    image = transformed_image.permute(1, 2, 0)
+    image = CHW2HWC(transformed_image)
     image += abs(image.min())
     image /= image.max()    
     image = (image * 255).to(torch.uint8)
     return image
 
-def getVisualizableTransformedImage(image_path, transforms):
-    image = Image.open(image_path)
+def getVisualizableTransformedImageFromPIL(image, transforms):
+    image = TF.to_tensor(image)
+    image = getVisualizableTransformedImageFromTensor(image, transforms)
+    return image
+
+def getVisualizableTransformedImageFromTensor(image, transforms):
     image = transforms(image)
     image = recoverTransformedImage(image)
     return image
@@ -68,7 +79,7 @@ if __name__ == '__main__':
     features = model(batch, feature_extraction=True)
     features = F.normalize(features, dim=1)
     similarity_matrix = cosineSimilarity(features.squeeze(), softmax=True, temperature=1)
-    image = getVisualizableTransformedImage(image_path, model.vit_weights.transforms())
+    image = getVisualizableTransformedImageFromPIL(Image.open(image_path), model.vit_weights.transforms())
     with torch.no_grad():
         for i in range(180):
             print(i)
