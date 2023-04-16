@@ -5,6 +5,7 @@ from tqdm import tqdm
 import numpy as np
 import os
 import pdb
+from time import time
 
 from models import ViTBackbone
 from utils import visualizePatchSimilarities, getVisualizableTransformedImageFromPIL, HWC2CHW
@@ -33,6 +34,7 @@ class ViTSSLTrainer():
         self.save_every = save_every
         self.writer = SummaryWriter(log_dir=self.save_path)
         self.criterion = SupConLoss()
+        self.object_detection = ObjectDetection(device=self.device)
 
     def snapshotStateDict(self, loss):
         state_dict = {
@@ -57,20 +59,16 @@ class ViTSSLTrainer():
         loss = checkpoint['loss']
 
     def o4p(self, images):        
-        object_detection = ObjectDetection()
         with torch.no_grad():
-            predictions = object_detection.inference(images.copy(), visualization=True)
-
+            predictions = self.object_detection.inference(images.copy(), visualization=False)
         features = self.model(images.copy(), feature_extraction=True)
-        assert not torch.isnan(features).any(), 'features'
         features = F.normalize(features, dim=-1)
-        assert not torch.isnan(features).any(), 'features norm'
-
         patch_size = int(self.model.vit.patch_size)
         features, labels = labelsFromDetections(features, predictions, patch_size)
-        assert not torch.isnan(features).any(), 'features reshape'
-        assert not torch.isnan(labels).any(), 'labels'
         loss = self.criterion(features, labels=labels)
+        if torch.isnan(loss).any():
+            with torch.no_grad():
+                predictions = object_detection.inference(images.copy(), visualization=True)
         assert not torch.isnan(loss).any(), 'loss'
         return loss
 
@@ -80,21 +78,12 @@ class ViTSSLTrainer():
             image = getVisualizableTransformedImageFromPIL(image, self.model.vit_weights.transforms())
             image = HWC2CHW(image)
             viz_transformed_images.append(image)
-        # with torch.autograd.detect_anomaly():            
         if self.task_type == 'o4p':
             loss = self.o4p(viz_transformed_images)
         self.optimizer.zero_grad()
         loss.backward()
-
-        grad_sum = 0
-        for name, param in self.model.named_parameters():
-            if param.grad is not None:
-                grad_sum += torch.sum(param.grad).item()
-        print('grad_sum', grad_sum)
-
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), 5)
         self.optimizer.step()
-
         if self.epoch >= 10:
             self.scheduler.step()        
         return loss.item()
@@ -134,15 +123,14 @@ class ViTSSLTrainer():
             dataloader = self.validate_loader
         epoch_loss = 0
         for batch_idx, batch_list in enumerate(dataloader):
-            print('start', batch_idx)
             images = [x[0] for x in batch_list]
             if train:
                 loss_val = self.trainBatch(images)
             else:
                 loss_val = self.validateBatch(images)
             epoch_loss += loss_val
-            print(f'is train: {train} batch: {batch_idx} / {len(dataloader)}, loss: {loss_val}', end='\n')
-            pdb.set_trace()
+            print(f'finished is train: {train} batch: {batch_idx} / {len(dataloader)}, loss: {loss_val}', end='\n')
+            # pdb.set_trace()
         epoch_loss /= len(self.train_loader)      
         return epoch_loss  
 

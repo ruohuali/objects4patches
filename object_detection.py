@@ -6,7 +6,8 @@ from torchvision.models import vit_b_16, ViT_B_16_Weights
 from torchvision.utils import draw_bounding_boxes
 from torchvision.transforms.functional import to_pil_image
 from PIL import Image
-import time
+from time import time
+import matplotlib.pyplot as plt
 
 from utils import getVisualizableTransformedImageFromPIL, HWC2CHW
 from models import preprocess
@@ -18,20 +19,38 @@ def getObjectDetectionModel():
     return model, weights
 
 class ObjectDetection(nn.Module):
-    def __init__(self):
+    def __init__(self, device=torch.device('cuda')):
         super().__init__()
+        self.device = device
         self.detector, self.detector_weights = getObjectDetectionModel()  
+        self.detector.to(self.device)
+
+    def filterWithArea(self, prediction, area_threshold):
+        boxes = prediction['boxes']
+        widths = boxes[:, 2] - boxes[:, 0]
+        heights = boxes[:, 3] - boxes[:, 1]
+        areas = widths * heights
+
+        kept_ids = torch.nonzero(areas >= area_threshold, as_tuple=True)[0]
+        prediction['boxes'] = prediction['boxes'][kept_ids]
+        prediction['scores'] = prediction['scores'][kept_ids]
+        prediction['labels'] = prediction['labels'][kept_ids] 
+        return prediction            
 
     def inference(self, images, visualization=True):
         self.detector.eval()
         batch = preprocess(images, self.detector_weights.transforms())
+
         with torch.no_grad():
+            batch = batch.to(self.device)
             predictions = self.detector.forward(batch)
             for i in range(len(predictions)):
                 kept_ids = torchvision.ops.nms(predictions[i]['boxes'], predictions[i]['scores'], 0.01) 
                 predictions[i]['boxes'] = predictions[i]['boxes'][kept_ids]
                 predictions[i]['scores'] = predictions[i]['scores'][kept_ids]
                 predictions[i]['labels'] = predictions[i]['labels'][kept_ids]
+                predictions[i] = self.filterWithArea(predictions[i], 50 * 50)
+
         if visualization:
             for image, prediction in zip(images, predictions):
                 labels = [self.detector_weights.meta['categories'][i] for i in prediction['labels']]
@@ -40,7 +59,10 @@ class ObjectDetection(nn.Module):
                                         colors='blue',
                                         width=1, font_size=30)
                 plot = to_pil_image(box.detach())
-                plot.show()
+                plt.figure()
+                plt.imshow(plot)
+                plt.show()
+
         return predictions
 
 if __name__ == '__main__':

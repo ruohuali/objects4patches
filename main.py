@@ -17,7 +17,7 @@ def main():
         args = yaml.safe_load(file)
 
     train_loader, validate_loader = getVOCDataloader('..', args['batch_size'], download=False, shuffle=False)
-    save_path = os.path.join('..', str(datetime.datetime.now()))
+    save_path = os.path.join('..', 'save_dir', str(datetime.datetime.now()))
 
     trainer = ViTSSLTrainer(args['task_type'], train_loader, validate_loader, args['epoch_num'], args['learning_rate'], \
                             args['weight_decay'], checkpoint_path=command_line_args.checkpoint_path, \

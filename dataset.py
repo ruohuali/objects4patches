@@ -4,7 +4,7 @@ from torchvision.models import vit_b_16, ViT_B_16_Weights
 from torch.utils.data import DataLoader, Subset
 import matplotlib.pyplot as plt
 
-from utils import getVisualizableTransformedImageFromPIL
+from utils import getVisualizableTransformedImageFromPIL, getVisualizableTransformedImageFromTensor
 
 def getVOCDataloader(path, batch_size, train_ratio=0.9, shuffle=True, transform=None, download=False):
     dataset = torchvision.datasets.VOCDetection(path, year='2012', image_set='trainval', transform=transform, download=download)
@@ -20,15 +20,17 @@ def getVOCDataloader(path, batch_size, train_ratio=0.9, shuffle=True, transform=
     return train_loader, validate_loader
 
 if __name__ == '__main__':
+    # transforms = transforms.Compose([transforms.CenterCrop])
     train_loader, validate_loader = getVOCDataloader('..', 5)
     weights = ViT_B_16_Weights.DEFAULT
     print(len(train_loader), len(validate_loader))
     for i, x in enumerate(train_loader):
-        print(len(x))
+        print('what', len(x))
         for xx in x:
+            print(xx)
             image = xx[0]
             plt.figure()
-            image = getVisualizableTransformedImageFromPIL(image, weights.transforms())
+            image = getVisualizableTransformedImageFromTensor(image, weights.transforms())
             plt.imshow(image)
             plt.show()
         if i == 0:
