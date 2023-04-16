@@ -19,4 +19,7 @@ if __name__ == '__main__':
         image = HWC2CHW(image)
         images.append(image)
 
-    model.inference(images)
+    model.inference(images.copy())
+
+    y = model(images.copy(), feature_extraction=True, cls_feature=True)
+    print('shape', y.shape)

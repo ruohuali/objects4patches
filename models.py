@@ -24,8 +24,9 @@ class ViTBackbone(nn.Module):
         self.vit, self.vit_weights = getViTModel(pretrained=pretrained)  
         self.device = device 
         self.vit.to(self.device)
+        self.avg_pool = nn.AdaptiveAvgPool1d(1)
 
-    def forward(self, images, feature_extraction=True):
+    def forward(self, images, feature_extraction=True, cls_feature=False):
         x = preprocess(images, self.vit_weights.transforms())
         x = x.to(self.device)
 
@@ -38,7 +39,11 @@ class ViTBackbone(nn.Module):
         x = self.vit.encoder(x)
 
         if feature_extraction:
-            return x[:, 1:]
+            if cls_feature:
+                y = self.avg_pool(x[:, 1:].permute(0, 2, 1)).permute(0, 2, 1)
+            else:
+                y = x[:, 1:]
+            return y
 
         # Classifier "token" as used by standard language architectures
         x = x[:, 0]
@@ -62,3 +67,5 @@ class ViTBackbone(nn.Module):
 
 if __name__ == '__main__':
     pass
+
+
