@@ -1,8 +1,11 @@
 import torch
+from PIL import Image
+import torch.optim as optim
 
 from object_detection import ObjectDetection
 from models import ViTBackbone
-from utils import getVisualizableTransformedImageFromPIL, visualizeLabels
+from utils import getVisualizableTransformedImageFromPIL, visualizeLabels, HWC2CHW
+from losses import SupConLoss
 
 def pixelIdx2PatchIdx(pixel_idx, patch_size):
     '''
@@ -14,11 +17,8 @@ def pixelIdx2PatchIdx(pixel_idx, patch_size):
     return i, j
 
 def makeLabelFromDetection(prediction, row_num, patch_size, running_class_id):
-    label = torch.ones(features.size(1), dtype=torch.long).view(row_num, row_num) * running_class_id
+    label = torch.ones(row_num, row_num, dtype=torch.long) * running_class_id
     running_class_id += 1
-    if len(prediction['boxes']) == 0:
-        prediction['boxes'] = torch.tensor([[patch_size * (row_num / 2 - 1), patch_size * (row_num / 2 - 1), \
-                                             patch_size * (row_num / 2 + 1), patch_size * (row_num / 2 + 1)]])
     for box in prediction['boxes']:
         lt_pixel_idx, rb_pixel_idx = box[:2], box[2:]
         lt_i, lt_j = pixelIdx2PatchIdx(lt_pixel_idx, patch_size)
@@ -60,8 +60,9 @@ if __name__ == '__main__':
     model = ViTBackbone(pretrained=True)
     
     for image_path in image_paths:
-        image = getVisualizableTransformedImageFromPIL(image_path, model.vit_weights.transforms())
-        image = image.permute(2, 0, 1)
+        image = Image.open(image_path)
+        image = getVisualizableTransformedImageFromPIL(image, model.vit_weights.transforms())
+        image = HWC2CHW(image)
         images.append(image)
 
     object_detection = ObjectDetection()
@@ -70,8 +71,18 @@ if __name__ == '__main__':
     features = model(images, feature_extraction=True)
     B, P2, D = features.size()
 
-    patch_size = 14
+    patch_size = int(model.vit.patch_size)
+    print('ps', patch_size)
     features, labels = labelsFromDetections(features, predictions, patch_size)
     print(features.shape, labels.shape)
 
     visualizeLabels(images, labels, (B, P2, D))
+
+    criterion = SupConLoss()
+    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+    optimizer.zero_grad()
+
+    loss = criterion(features, labels=labels)
+
+    loss.backward()
+    optimizer.step()

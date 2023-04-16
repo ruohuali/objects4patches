@@ -1,4 +1,4 @@
-import torch
+import torch, torchvision
 from torch import nn
 from torchvision.io.image import read_image
 from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2, FasterRCNN_ResNet50_FPN_V2_Weights
@@ -27,6 +27,11 @@ class ObjectDetection(nn.Module):
         batch = preprocess(images, self.detector_weights.transforms())
         with torch.no_grad():
             predictions = self.detector.forward(batch)
+            for i in range(len(predictions)):
+                kept_ids = torchvision.ops.nms(predictions[i]['boxes'], predictions[i]['scores'], 0.01) 
+                predictions[i]['boxes'] = predictions[i]['boxes'][kept_ids]
+                predictions[i]['scores'] = predictions[i]['scores'][kept_ids]
+                predictions[i]['labels'] = predictions[i]['labels'][kept_ids]
         if visualization:
             for image, prediction in zip(images, predictions):
                 labels = [self.detector_weights.meta['categories'][i] for i in prediction['labels']]

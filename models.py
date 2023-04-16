@@ -19,12 +19,15 @@ def preprocess(images, model_preprocess):
     return batch
 
 class ViTBackbone(nn.Module):
-    def __init__(self, pretrained=False):
+    def __init__(self, device=torch.device('cuda'), pretrained=False):
         super().__init__()
         self.vit, self.vit_weights = getViTModel(pretrained=pretrained)  
+        self.device = device 
+        self.vit.to(self.device)
 
     def forward(self, images, feature_extraction=True):
         x = preprocess(images, self.vit_weights.transforms())
+        x = x.to(self.device)
 
         # Reshape and permute the input tensor
         x = self.vit._process_input(x)

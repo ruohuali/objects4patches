@@ -5,6 +5,7 @@ import torchvision.transforms.functional as TF
 from models import ViTBackbone, preprocess
 from PIL import Image
 import matplotlib.pyplot as plt
+import io
 
 from losses import cosineSimilarity
 
@@ -31,7 +32,7 @@ def getVisualizableTransformedImageFromTensor(image, transforms):
     image = recoverTransformedImage(image)
     return image
 
-def visualizePatchSimilarities(image, similarity_matrix, patch_idx):
+def visualizePatchSimilarities(image, similarity_matrix, patch_idx, save=True):
     similarity_matrix = similarity_matrix.squeeze()
     assert similarity_matrix.dim() == 2 and similarity_matrix.size(0) == similarity_matrix.size(1)
     row_num = int(similarity_matrix.size(0)**(1 / 2))
@@ -47,9 +48,15 @@ def visualizePatchSimilarities(image, similarity_matrix, patch_idx):
     axes[1].imshow(patch_similarities)
     axes[1].set_title(f'patch_similarities')
     axes[2].imshow(patch_idx_plot)
-    axes[2].set_title(f'patch_idx_plot')    
-    plt.savefig(f'images/{patch_idx}.jpg') 
-    # plt.show()
+    axes[2].set_title(f'patch_idx_plot')   
+    if save:
+        plt.savefig(f'images/{patch_idx}.jpg') 
+
+    plot_buffer = io.BytesIO()
+    plt.savefig(plot_buffer, format='png')
+    plot_image = Image.open(plot_buffer)
+    plot_tensor = TF.to_tensor(plot_image)  
+    return plot_tensor
 
 def visualizeLabels(images, labels, features_shape):
     B, P2, D = features_shape
@@ -57,7 +64,7 @@ def visualizeLabels(images, labels, features_shape):
     labels = labels.view(B, P2)
     for image, label in zip(images, labels):
         label = label.view(row_num, row_num)
-        image = image.permute(1, 2, 0)
+        image = CHW2HWC(image)
         print(f'class id {label.unique()}')
 
         fig, axes = plt.subplots(1, 2, figsize=(12, 6))
@@ -72,15 +79,21 @@ if __name__ == '__main__':
     print(model.vit_weights.transforms())
     model.eval()
     vit, weights = model.vit, model.vit_weights
-    image_path = 'example_images/voc_example3.jpg'
-    image1 = read_image(image_path)
-    batch = preprocess([image1], weights.transforms())
+    image_path = 'example_images/cat.jpg'
+    image1 = Image.open(image_path)
+    images = [image1]
 
-    features = model(batch, feature_extraction=True)
-    features = F.normalize(features, dim=1)
+    features = model(images, feature_extraction=True)
+    features = F.normalize(features, dim=-1)
+    print(features.shape)
     similarity_matrix = cosineSimilarity(features.squeeze(), softmax=True, temperature=1)
     image = getVisualizableTransformedImageFromPIL(Image.open(image_path), model.vit_weights.transforms())
     with torch.no_grad():
         for i in range(180):
             print(i)
             visualizePatchSimilarities(image, similarity_matrix, i)
+    #     x = visualizePatchSimilarities(image, similarity_matrix, 50, save=False)
+    # plt.figure()
+    # x = CHW2HWC(x)
+    # plt.imshow(x)
+    # plt.show()
