@@ -6,17 +6,22 @@ import matplotlib.pyplot as plt
 
 from utils import getVisualizableTransformedImageFromPIL, getVisualizableTransformedImageFromTensor
 
-def getVOCDataloader(path, batch_size, train_ratio=0.9, shuffle=True, transform=None, download=False):
+def getVOCDataloader(path, batch_size, ratio=1, train_ratio=0.9, shuffle=True, transform=None, download=False):
     dataset = torchvision.datasets.VOCDetection(path, year='2012', image_set='trainval', transform=transform, download=download)
 
-    idx = int(len(dataset) * train_ratio)
-    train_split = range(0, idx)
+    idx = int(len(dataset) * ratio)
+    split = range(0, idx)
+    dataset = Subset(dataset, split)
+
+    train_idx = int(len(dataset) * train_ratio)
+    train_split = range(0, train_idx)
     train_dataset = Subset(dataset, train_split)
-    validate_split = range(idx, len(dataset))
+    validate_split = range(train_idx, len(dataset))
     validate_dataset = Subset(dataset, validate_split)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=lambda x: x)
     validate_loader = DataLoader(validate_dataset, batch_size=1, shuffle=False, collate_fn=lambda x: x)
+
     return train_loader, validate_loader
 
 if __name__ == '__main__':

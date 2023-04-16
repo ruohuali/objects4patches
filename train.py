@@ -6,6 +6,7 @@ import numpy as np
 import os
 import pdb
 from time import time
+from PIL import Image
 
 from models import ViTBackbone
 from utils import visualizePatchSimilarities, getVisualizableTransformedImageFromPIL, HWC2CHW
@@ -32,6 +33,7 @@ class ViTSSLTrainer():
         self.save_path = save_path
         os.mkdir(self.save_path)
         self.save_every = save_every
+        self.example_image_path = example_image_path
         self.writer = SummaryWriter(log_dir=self.save_path)
         self.criterion = SupConLoss()
         self.object_detection = ObjectDetection(device=self.device)
@@ -49,6 +51,7 @@ class ViTSSLTrainer():
     def save(self, state_dict):
         save_path = os.path.join(self.save_path, str(self.epoch) + '.pt')
         torch.save(state_dict, save_path)
+        print(f'saved state dict of {state_dict["epoch"]} to {save_path}')
 
     def load(self, path):
         checkpoint = torch.load(path)
@@ -57,6 +60,7 @@ class ViTSSLTrainer():
         self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
         self.epoch = checkpoint['epoch']
         loss = checkpoint['loss']
+        print(f'loaded state dict of {checkpoint["epoch"]} from {path}')
 
     def o4p(self, images):        
         with torch.no_grad():
@@ -91,7 +95,7 @@ class ViTSSLTrainer():
     def validateBatch(self, images):
         viz_transformed_images = []
         for image in images:
-            image = getVisualizableTransformedImageFromPIL(image, model.vit_weights.transforms())
+            image = getVisualizableTransformedImageFromPIL(image, self.model.vit_weights.transforms())
             image = HWC2CHW(image)
             viz_transformed_images.append(image)
         with torch.no_grad():
@@ -105,10 +109,11 @@ class ViTSSLTrainer():
         images = [image]
 
         with torch.no_grad():
-            features = model(images, feature_extraction=True)
+            features = self.model(images, feature_extraction=True)
             features = F.normalize(features, dim=-1)
 
             similarity_matrix = cosineSimilarity(features.squeeze(), softmax=True, temperature=1)
+            similarity_matrix = similarity_matrix.detach().cpu()
             image = getVisualizableTransformedImageFromPIL(image, self.model.vit_weights.transforms())
             for patch_idx in range(75, 125, 3):
                 plot_tensor = visualizePatchSimilarities(image, similarity_matrix, patch_idx, save=False)
@@ -129,7 +134,7 @@ class ViTSSLTrainer():
             else:
                 loss_val = self.validateBatch(images)
             epoch_loss += loss_val
-            print(f'finished is train: {train} batch: {batch_idx} / {len(dataloader)}, loss: {loss_val}', end='\n')
+            print(f'finished is train: {train} batch: {batch_idx} / {len(dataloader)}, loss: {loss_val}', end='\r', flush=True)
             # pdb.set_trace()
         epoch_loss /= len(self.train_loader)      
         return epoch_loss  
@@ -147,11 +152,10 @@ class ViTSSLTrainer():
                 best_state_dict = self.snapshotStateDict(min_validate_loss)
             if self.epoch % self.save_every == 0:
                 self.save(best_state_dict)
-                print(f'saved model at {self.save_path}')
 
-            self.writer.add_scalar('train_epoch_loss', train_epoch_loss, global_step=self.epoch)
-            self.writer.add_scalar('validate_epoch_loss', validate_epoch_loss, global_step=self.epoch)
-            self.writer.add_scalar('learning_rate', self.scheduler.get_lr()[0], global_step=self.epoch)
+            self.writer.add_scalar('loss/train_epoch_loss', train_epoch_loss, global_step=self.epoch)
+            self.writer.add_scalar('loss/validate_epoch_loss', validate_epoch_loss, global_step=self.epoch)
+            self.writer.add_scalar('learning_rate', self.scheduler.get_last_lr()[0], global_step=self.epoch)
             self.visualizePatchSimilarities()
 
             self.epoch += 1

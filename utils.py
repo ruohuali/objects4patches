@@ -54,6 +54,7 @@ def visualizePatchSimilarities(image, similarity_matrix, patch_idx, save=True):
 
     plot_buffer = io.BytesIO()
     plt.savefig(plot_buffer, format='png')
+    plt.close()
     plot_image = Image.open(plot_buffer)
     plot_tensor = TF.to_tensor(plot_image)  
     return plot_tensor
