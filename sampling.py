@@ -1,6 +1,8 @@
 import torch
 from PIL import Image
 import torch.optim as optim
+from torchvision import transforms
+import matplotlib.pyplot as plt
 
 from object_detection import ObjectDetection
 from models import ViTBackbone
@@ -53,41 +55,74 @@ def labelsFromDetections(features, predictions, patch_size):
     features = features.unsqueeze(1)
     return features, labels
 
-def multiCropLabels(features, batch_size, n_views):
+def multiCropTransform(images, n_views):
     '''
-    @param features ~ (B * V, 1, N)
+    @param images ~ [PIL image]
     '''
+    multi_crop_transform = transforms.Compose([
+        transforms.CenterCrop((400, 400)),
+        transforms.RandomResizedCrop((256, 256))
+    ])
+    transformed_images = []
+    for image in images:
+        for v in range(n_views):
+            transformed_image = multi_crop_transform(image)
+            transformed_images.append(transformed_image)
+    return transformed_images
+
+def labelsFromMultiCrop(features, batch_size):
+    '''
+    @param features ~ (B*V, 1, D)
+    @return labels ~ (B*V)
+    '''
+    n_views = features.size(0) // batch_size
+    labels = torch.tensor([[j for i in range(n_views)] for j in range(batch_size)])
+    labels = labels.reshape(-1)
+    return features, labels
             
 if __name__ == '__main__':
     image_paths = ['example_images/coco_example1.jpg', 'example_images/coco_example2.jpg', 'example_images/voc_example1.jpg']
     images = []
 
-    model = ViTBackbone(pretrained=True)
+    # model = ViTBackbone(pretrained=True)
     
-    for image_path in image_paths:
-        image = Image.open(image_path)
-        image = getVisualizableTransformedImageFromPIL(image, model.vit_weights.transforms())
-        image = HWC2CHW(image)
-        images.append(image)
+    # for image_path in image_paths:
+    #     image = Image.open(image_path)
+    #     image = getVisualizableTransformedImageFromPIL(image, model.vit_weights.transforms())
+    #     image = HWC2CHW(image)
+    #     images.append(image)
 
-    object_detection = ObjectDetection()
-    predictions = object_detection.inference(images, visualization=False)
+    # object_detection = ObjectDetection()
+    # predictions = object_detection.inference(images, visualization=False)
 
-    features = model(images, feature_extraction=True)
-    B, P2, D = features.size()
+    # features = model(images, feature_extraction=True)
+    # B, P2, D = features.size()
 
-    patch_size = int(model.vit.patch_size)
-    print('ps', patch_size)
-    features, labels = labelsFromDetections(features, predictions, patch_size)
-    print(features.shape, labels.shape)
+    # patch_size = int(model.vit.patch_size)
+    # print('ps', patch_size)
+    # features, labels = labelsFromDetections(features, predictions, patch_size)
+    # print(features.shape, labels.shape)
 
-    visualizeLabels(images, labels, (B, P2, D))
+    # visualizeLabels(images, labels, (B, P2, D))
 
-    criterion = SupConLoss()
-    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-    optimizer.zero_grad()
+    # criterion = SupConLoss()
+    # optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+    # optimizer.zero_grad()
 
-    loss = criterion(features, labels=labels)
+    # loss = criterion(features, labels=labels)
 
-    loss.backward()
-    optimizer.step()
+    # loss.backward()
+    # optimizer.step()
+
+
+    images = [Image.open(image_path) for image_path in image_paths]
+    B = len(images)
+    images = multiCropTransform(images, 2)
+
+    features = torch.randn(len(images), 1, 100)
+    _, labels = labelsFromMultiCrop(features, B)
+    print(labels)
+    
+    for image in images:
+        plt.imshow(image)
+        plt.show()

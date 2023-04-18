@@ -26,7 +26,7 @@ class ViTBackbone(nn.Module):
         self.vit.to(self.device)
         self.avg_pool = nn.AdaptiveAvgPool1d(1)
 
-    def forward(self, images, feature_extraction=True, cls_feature=False):
+    def forward(self, images, feature_extraction=True, pooling=False):
         x = preprocess(images, self.vit_weights.transforms())
         x = x.to(self.device)
 
@@ -39,7 +39,7 @@ class ViTBackbone(nn.Module):
         x = self.vit.encoder(x)
 
         if feature_extraction:
-            if cls_feature:
+            if pooling:
                 y = self.avg_pool(x[:, 1:].permute(0, 2, 1)).permute(0, 2, 1)
             else:
                 y = x[:, 1:]

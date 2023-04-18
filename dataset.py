@@ -20,7 +20,7 @@ def getVOCDataloader(path, batch_size, ratio=1, train_ratio=0.9, shuffle=True, t
     validate_dataset = Subset(dataset, validate_split)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=lambda x: x)
-    validate_loader = DataLoader(validate_dataset, batch_size=1, shuffle=False, collate_fn=lambda x: x)
+    validate_loader = DataLoader(validate_dataset, batch_size=batch_size, shuffle=False, collate_fn=lambda x: x)
 
     return train_loader, validate_loader
 

@@ -10,7 +10,7 @@ from PIL import Image
 
 from models import ViTBackbone
 from utils import visualizePatchSimilarities, getVisualizableTransformedImageFromPIL, HWC2CHW
-from sampling import labelsFromDetections
+from sampling import labelsFromDetections, labelsFromMultiCrop, multiCropTransform
 from object_detection import ObjectDetection
 from losses import SupConLoss, cosineSimilarity
 
@@ -20,6 +20,8 @@ class ViTSSLTrainer():
         self.device = device
         self.task_type = task_type
         if self.task_type == 'o4p':
+            self.model = ViTBackbone(device=self.device, pretrained=False)
+        elif self.task_type == 'mp':
             self.model = ViTBackbone(device=self.device, pretrained=False)
         self.train_loader, self.validate_loader = train_loader, validate_loader
         self.epoch_num = epoch_num
@@ -70,10 +72,19 @@ class ViTSSLTrainer():
         patch_size = int(self.model.vit.patch_size)
         features, labels = labelsFromDetections(features, predictions, patch_size)
         loss = self.criterion(features, labels=labels)
+        return loss
+
+    def multiCrop(self, images):
+        batch_size = len(images)
+        images = multiCropTransform(images, 2)
+        features = self.model(images.copy(), feature_extraction=True, pooling=True)
+        features = F.normalize(features, dim=-1)
+        features, labels = labelsFromMultiCrop(features, batch_size)
+        loss = self.criterion(features, labels=labels)
         if torch.isnan(loss).any():
             with torch.no_grad():
                 predictions = object_detection.inference(images.copy(), visualization=True)
-        assert not torch.isnan(loss).any(), 'loss is nan'
+        assert not torch.isnan(loss).any(), 'loss is nan'        
         return loss
 
     def trainBatch(self, images):
@@ -84,6 +95,8 @@ class ViTSSLTrainer():
             viz_transformed_images.append(image)
         if self.task_type == 'o4p':
             loss = self.o4p(viz_transformed_images)
+        elif self.task_type == 'mp':
+            loss = self.multiCrop(viz_transformed_images)
         self.optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), 5)
@@ -99,7 +112,10 @@ class ViTSSLTrainer():
             image = HWC2CHW(image)
             viz_transformed_images.append(image)
         with torch.no_grad():
-            loss = self.o4p(viz_transformed_images)
+            if self.task_type == 'o4p':
+                loss = self.o4p(viz_transformed_images)
+            elif self.task_type == 'mp':
+                loss = self.multiCrop(viz_transformed_images)
         return loss.item()
 
     def visualizePatchSimilarities(self):
