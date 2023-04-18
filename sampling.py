@@ -52,6 +52,11 @@ def labelsFromDetections(features, predictions, patch_size):
     features = features.contiguous().view(features.size(0) * features.size(1), features.size(2))
     features = features.unsqueeze(1)
     return features, labels
+
+def multiCropLabels(features, batch_size, n_views):
+    '''
+    @param features ~ (B * V, 1, N)
+    '''
             
 if __name__ == '__main__':
     image_paths = ['example_images/coco_example1.jpg', 'example_images/coco_example2.jpg', 'example_images/voc_example1.jpg']

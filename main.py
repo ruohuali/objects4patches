@@ -16,7 +16,7 @@ def main():
     with open(command_line_args.config_path, 'r') as file:
         args = yaml.safe_load(file)
 
-    train_loader, validate_loader = getVOCDataloader('..', args['batch_size'], ratio=0.01, download=False, shuffle=False)
+    train_loader, validate_loader = getVOCDataloader('..', args['batch_size'], ratio=1, download=False, shuffle=False)
     save_path = os.path.join('..', 'save_dir', str(datetime.datetime.now()))
 
     trainer = ViTSSLTrainer(args['task_type'], train_loader, validate_loader, args['epoch_num'], args['learning_rate'], \

@@ -24,7 +24,7 @@ class ViTSSLTrainer():
         self.train_loader, self.validate_loader = train_loader, validate_loader
         self.epoch_num = epoch_num
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.epoch_num * len(self.train_loader) * 2, eta_min=5e-5,
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.epoch_num * len(self.train_loader) / 2, eta_min=5e-5,
                                                                     last_epoch=-1)
         self.epoch = 0
         if checkpoint_path != '':
@@ -64,7 +64,7 @@ class ViTSSLTrainer():
 
     def o4p(self, images):        
         with torch.no_grad():
-            predictions = self.object_detection.inference(images.copy(), visualization=False)
+            predictions = self.object_detection.inference(images.copy(), add_self_patch=True, visualization=False)
         features = self.model(images.copy(), feature_extraction=True)
         features = F.normalize(features, dim=-1)
         patch_size = int(self.model.vit.patch_size)
@@ -73,7 +73,7 @@ class ViTSSLTrainer():
         if torch.isnan(loss).any():
             with torch.no_grad():
                 predictions = object_detection.inference(images.copy(), visualization=True)
-        assert not torch.isnan(loss).any(), 'loss'
+        assert not torch.isnan(loss).any(), 'loss is nan'
         return loss
 
     def trainBatch(self, images):

@@ -16,7 +16,7 @@ def getObjectDetectionModel():
     weights = FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT
     model = fasterrcnn_resnet50_fpn_v2(weights=weights, box_score_thresh=0.8)
     model.eval()
-    return model, weights
+    return model, weights    
 
 class ObjectDetection(nn.Module):
     def __init__(self, device=torch.device('cuda')):
@@ -24,6 +24,7 @@ class ObjectDetection(nn.Module):
         self.device = device
         self.detector, self.detector_weights = getObjectDetectionModel()  
         self.detector.to(self.device)
+        self.detector.eval()
 
     def filterWithArea(self, prediction, area_threshold):
         boxes = prediction['boxes']
@@ -37,18 +38,45 @@ class ObjectDetection(nn.Module):
         prediction['labels'] = prediction['labels'][kept_ids] 
         return prediction            
 
-    def inference(self, images, visualization=True):
-        self.detector.eval()
+    def filterWithNMS(self, prediction, iou_threshold=0.01):
+        kept_ids = torchvision.ops.nms(prediction['boxes'], prediction['scores'], iou_threshold) 
+        prediction['boxes'] = prediction['boxes'][kept_ids]
+        prediction['scores'] = prediction['scores'][kept_ids]
+        prediction['labels'] = prediction['labels'][kept_ids]
+        return prediction
+
+    def addSelfPatch2Prediction(self, prediction, height, width, patch_size, num_patches):
+        # Generate random starting coordinates for patches
+        rand_top_left_x = torch.randint(0, width - patch_size, (num_patches,))
+        rand_top_left_y = torch.randint(0, height - patch_size, (num_patches,))
+
+        patch_indices = []
+
+        for i in range(num_patches):
+            x_start, y_start = rand_top_left_x[i], rand_top_left_y[i]
+            x_end, y_end = x_start + patch_size, y_start + patch_size
+            patch_indices.append([x_start, y_start, x_end, y_end])
+
+        # Convert patch_indices list to a tensor
+        patch_indices_tensor = torch.tensor(patch_indices).to(self.device)
+        patch_scores_tensor = torch.tensor([0.1 for _ in range(len(patch_indices_tensor))]).to(self.device)
+        patch_labels_tensor = torch.tensor([0 for _ in range(len(patch_indices_tensor))]).to(self.device)
+
+        prediction['boxes'] = torch.cat((prediction['boxes'], patch_indices_tensor), dim=0)   
+        prediction['scores'] = torch.cat((prediction['scores'], patch_scores_tensor), dim=0)   
+        prediction['labels'] = torch.cat((prediction['labels'], patch_labels_tensor), dim=0)   
+        return prediction
+
+    def inference(self, images, add_self_patch=False, visualization=True):
         batch = preprocess(images, self.detector_weights.transforms())
 
         with torch.no_grad():
             batch = batch.to(self.device)
             predictions = self.detector.forward(batch)
             for i in range(len(predictions)):
-                kept_ids = torchvision.ops.nms(predictions[i]['boxes'], predictions[i]['scores'], 0.01) 
-                predictions[i]['boxes'] = predictions[i]['boxes'][kept_ids]
-                predictions[i]['scores'] = predictions[i]['scores'][kept_ids]
-                predictions[i]['labels'] = predictions[i]['labels'][kept_ids]
+                if add_self_patch:
+                    predictions[i] = self.addSelfPatch2Prediction(predictions[i], batch.size(-2), batch.size(-1), 50, 30)
+                predictions[i] = self.filterWithNMS(predictions[i])
                 predictions[i] = self.filterWithArea(predictions[i], 50 * 50)
 
         if visualization:
@@ -76,7 +104,7 @@ if __name__ == '__main__':
         images.append(image)
 
     object_detection = ObjectDetection()
-    predictions = object_detection.inference(images, visualization=True)
+    predictions = object_detection.inference(images, add_self_patch=True, visualization=True)
     for p in predictions:
         print(p['boxes'])
         print('\n')
