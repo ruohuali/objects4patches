@@ -108,7 +108,7 @@ class ViTSSLTrainer():
         elif self.task_type == 'mp':
             loss = self.multiCrop(viz_transformed_images)
         elif self.task_type == 'lp':
-            labels = torch.tensor(annotations)
+            labels = torch.tensor(annotations).to(self.device)
             loss = self.linearProbe(viz_transformed_images, labels)
         self.optimizer.zero_grad()
         loss.backward()
@@ -130,7 +130,7 @@ class ViTSSLTrainer():
             elif self.task_type == 'mp':
                 loss = self.multiCrop(viz_transformed_images)
             elif self.task_type == 'lp':
-                labels = torch.tensor(annotations)
+                labels = torch.tensor(annotations).to(self.device)
                 loss = self.linearProbe(viz_transformed_images, labels)                
         return loss.item()
 

@@ -5,7 +5,7 @@ import datetime
 import os
 
 from train import ViTSSLTrainer
-from datasets import getVOCDataloader
+from datasets import getVOCDataloader, getCaltechDataloader
 
 def main():
     parser = argparse.ArgumentParser()
@@ -16,9 +16,9 @@ def main():
     with open(command_line_args.config_path, 'r') as file:
         args = yaml.safe_load(file)
     if args['task_type'] == 'o4p' or args['task_type'] == 'mp':
-        train_loader, validate_loader = getVOCDataloader('..', args['batch_size'], ratio=0.01, download=False, shuffle=False)
+        train_loader, validate_loader = getVOCDataloader('..', args['batch_size'], ratio=0.01, download=False, shuffle=True)
     elif args['task_type'] == 'lp':
-        # train_loader, validate_loader = getVOCDataloader('..', args['batch_size'], ratio=0.01, download=False, shuffle=False)
+        train_loader, validate_loader = getCaltechDataloader('..', args['batch_size'], ratio=0.01, download=False, shuffle=True)
     save_path = os.path.join('..', 'save_dir', str(datetime.datetime.now()))
 
     trainer = ViTSSLTrainer(args['task_type'], train_loader, validate_loader, args['epoch_num'], args['learning_rate'], \
