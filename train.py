@@ -23,6 +23,8 @@ class ViTSSLTrainer():
             self.model = ViTBackbone(device=self.device, pretrained=False)
         elif self.task_type == 'mp':
             self.model = ViTBackbone(device=self.device, pretrained=False)
+        elif self.task_type == 'lp':
+            self.model = ViTBackbone(device=self.device, pretrained=False)
         self.train_loader, self.validate_loader = train_loader, validate_loader
         self.epoch_num = epoch_num
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate, weight_decay=weight_decay)
@@ -37,7 +39,10 @@ class ViTSSLTrainer():
         self.save_every = save_every
         self.example_image_path = example_image_path
         self.writer = SummaryWriter(log_dir=self.save_path)
-        self.criterion = SupConLoss()
+        if self.task_type == 'o4p' or self.task_type == 'mp':
+            self.criterion = SupConLoss()
+        elif self.task_type == 'lp':
+            self.criterion = torch.nn.CrossEntropyLoss()
         self.object_detection = ObjectDetection(device=self.device)
 
     def snapshotStateDict(self, loss):
@@ -87,7 +92,12 @@ class ViTSSLTrainer():
         assert not torch.isnan(loss).any(), 'loss is nan'        
         return loss
 
-    def trainBatch(self, images):
+    def linearProbe(self, images, classes):
+        logits = self.model(images, feature_extraction=False)
+        loss = self.criterion(logits, classes)
+        return loss
+
+    def trainBatch(self, images, annotations):
         viz_transformed_images = []
         for image in images:
             image = getVisualizableTransformedImageFromPIL(image, self.model.vit_weights.transforms())
@@ -97,6 +107,9 @@ class ViTSSLTrainer():
             loss = self.o4p(viz_transformed_images)
         elif self.task_type == 'mp':
             loss = self.multiCrop(viz_transformed_images)
+        elif self.task_type == 'lp':
+            labels = torch.tensor(annotations)
+            loss = self.linearProbe(viz_transformed_images, labels)
         self.optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), 5)
@@ -105,7 +118,7 @@ class ViTSSLTrainer():
             self.scheduler.step()        
         return loss.item()
 
-    def validateBatch(self, images):
+    def validateBatch(self, images, annotations):
         viz_transformed_images = []
         for image in images:
             image = getVisualizableTransformedImageFromPIL(image, self.model.vit_weights.transforms())
@@ -116,6 +129,9 @@ class ViTSSLTrainer():
                 loss = self.o4p(viz_transformed_images)
             elif self.task_type == 'mp':
                 loss = self.multiCrop(viz_transformed_images)
+            elif self.task_type == 'lp':
+                labels = torch.tensor(annotations)
+                loss = self.linearProbe(viz_transformed_images, labels)                
         return loss.item()
 
     def visualizePatchSimilarities(self):
@@ -145,10 +161,11 @@ class ViTSSLTrainer():
         epoch_loss = 0
         for batch_idx, batch_list in enumerate(dataloader):
             images = [x[0] for x in batch_list]
+            annotations = [x[1] for x in batch_list]
             if train:
-                loss_val = self.trainBatch(images)
+                loss_val = self.trainBatch(images, annotations)
             else:
-                loss_val = self.validateBatch(images)
+                loss_val = self.validateBatch(images, annotations)
             epoch_loss += loss_val
             print(f'finished is train: {train} batch: {batch_idx} / {len(dataloader)}, loss: {loss_val}', end='\r', flush=True)
             # pdb.set_trace()
