@@ -16,13 +16,13 @@ def main():
     with open(command_line_args.config_path, 'r') as file:
         args = yaml.safe_load(file)
     if args['task_type'] == 'o4p' or args['task_type'] == 'mp':
-        train_loader, validate_loader = getVOCDataloader('..', args['batch_size'], ratio=0.01, download=False, shuffle=True)
+        train_dataloader, validate_dataloader = getVOCDataloader('..', args['batch_size'], ratio=0.01, download=False, shuffle=True)
     elif args['task_type'] == 'lp':
-        train_loader, validate_loader = getCaltechDataloader('..', args['batch_size'], ratio=0.01, download=False, shuffle=True)
+        train_dataloader, validate_dataloader, test_dataloader = getCaltechDataloader('..', args['batch_size'], ratio=0.3, download=False, shuffle=True)
     save_path = os.path.join('..', 'save_dir', str(datetime.datetime.now()))
 
-    trainer = ViTSSLTrainer(args['task_type'], train_loader, validate_loader, args['epoch_num'], args['learning_rate'], \
-                            args['weight_decay'], checkpoint_path=command_line_args.checkpoint_path, \
+    trainer = ViTSSLTrainer(args['task_type'], train_dataloader, validate_dataloader, args['epoch_num'], args['learning_rate'], \
+                            args['weight_decay'], test_dataloader=test_dataloader, checkpoint_path=command_line_args.checkpoint_path, \
                             save_path=save_path, save_every=1)
 
     trainer.train()

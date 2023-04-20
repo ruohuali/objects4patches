@@ -23,6 +23,7 @@ def recoverTransformedImage(transformed_image):
     return image
 
 def getVisualizableTransformedImageFromPIL(image, transforms):
+    image = image.convert('RGB')
     image = TF.to_tensor(image)
     image = getVisualizableTransformedImageFromTensor(image, transforms)
     return image

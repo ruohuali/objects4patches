@@ -15,7 +15,7 @@ from object_detection import ObjectDetection
 from losses import SupConLoss, cosineSimilarity
 
 class ViTSSLTrainer():
-    def __init__(self, task_type, train_loader, validate_loader, epoch_num, learning_rate, weight_decay, checkpoint_path='', \
+    def __init__(self, task_type, train_dataloader, validate_dataloader, epoch_num, learning_rate, weight_decay, checkpoint_path='', test_dataloader=None, \
                  save_path='../trained_models', example_image_path='example_images/voc_example3.jpg', device=torch.device('cuda'), save_every=10):
         self.device = device
         self.task_type = task_type
@@ -25,10 +25,10 @@ class ViTSSLTrainer():
             self.model = ViTBackbone(device=self.device, pretrained=False)
         elif self.task_type == 'lp':
             self.model = ViTBackbone(device=self.device, pretrained=False)
-        self.train_loader, self.validate_loader = train_loader, validate_loader
+        self.train_dataloader, self.validate_dataloader, self.test_dataloader = train_dataloader, validate_dataloader, test_dataloader
         self.epoch_num = epoch_num
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.epoch_num * len(self.train_loader) / 2, eta_min=5e-5,
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.epoch_num * len(self.train_dataloader), eta_min=5e-5,
                                                                     last_epoch=-1)
         self.epoch = 0
         if checkpoint_path != '':
@@ -114,7 +114,7 @@ class ViTSSLTrainer():
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), 5)
         self.optimizer.step()
-        if self.epoch >= 10:
+        if self.epoch >= 1:
             self.scheduler.step()        
         return loss.item()
 
@@ -154,10 +154,10 @@ class ViTSSLTrainer():
     def doEpoch(self, train):
         if train:
             self.model.train()
-            dataloader = self.train_loader
+            dataloader = self.train_dataloader
         else:
             self.model.eval()
-            dataloader = self.validate_loader
+            dataloader = self.validate_dataloader
         epoch_loss = 0
         for batch_idx, batch_list in enumerate(dataloader):
             images = [x[0] for x in batch_list]
@@ -169,8 +169,35 @@ class ViTSSLTrainer():
             epoch_loss += loss_val
             print(f'finished is train: {train} batch: {batch_idx} / {len(dataloader)}, loss: {loss_val}', end='\r', flush=True)
             # pdb.set_trace()
-        epoch_loss /= len(self.train_loader)      
+        epoch_loss /= len(self.train_dataloader)      
         return epoch_loss  
+
+    def testLinearProbe(self):
+        self.model.eval()  # Set the model to evaluation mode
+        correct = 0
+
+        assert self.test_dataloader.batch_size == 1, 'testing batch size should be 1'
+
+        # Disable gradient computation to save memory and speed up the process
+        correct = 0
+        with torch.no_grad():
+            for data in self.test_dataloader:
+                image, label = data[0]
+
+                image = getVisualizableTransformedImageFromPIL(image, self.model.vit_weights.transforms())
+                image = HWC2CHW(image)
+
+                label = torch.tensor([label]).to(self.device)
+
+                outputs = self.model([image], feature_extraction=False)  # Forward pass
+                outputs = outputs.squeeze()
+                predicted = outputs.argmax()
+                
+                correct += (predicted == label.item()).sum().item()
+                print('compare', correct, predicted, label.item())
+
+        accuracy = correct / len(self.test_dataloader)
+        return accuracy
 
     def train(self):
         min_validate_loss = np.inf
@@ -180,6 +207,10 @@ class ViTSSLTrainer():
             train_epoch_loss = self.doEpoch(True)
             validate_epoch_loss = self.doEpoch(False)
 
+            if self.task_type == 'lp':
+                accuracy = self.testLinearProbe()
+                print(f'\nepoch: {self.epoch} / {self.epoch_num}, accuracy: {accuracy}')
+
             if validate_epoch_loss < min_validate_loss:
                 min_validate_loss = validate_epoch_loss
                 best_state_dict = self.snapshotStateDict(min_validate_loss)
@@ -188,8 +219,11 @@ class ViTSSLTrainer():
 
             self.writer.add_scalar('loss/train_epoch_loss', train_epoch_loss, global_step=self.epoch)
             self.writer.add_scalar('loss/validate_epoch_loss', validate_epoch_loss, global_step=self.epoch)
+            if self.task_type == 'lp':
+                self.writer.add_scalar('accuracy', accuracy, global_step=self.epoch)
             self.writer.add_scalar('learning_rate', self.scheduler.get_last_lr()[0], global_step=self.epoch)
-            self.visualizePatchSimilarities()
+            if self.task_type == 'o4p' or self.task_type == 'mp':
+                self.visualizePatchSimilarities()
 
             self.epoch += 1
 
