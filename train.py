@@ -81,7 +81,7 @@ class ViTSSLTrainer():
 
     def multiCrop(self, images):
         batch_size = len(images)
-        images = multiCropTransform(images, 2)
+        images = multiCropTransform(images, 5)
         features = self.model(images.copy(), feature_extraction=True, pooling=True)
         features = F.normalize(features, dim=-1)
         features, labels = labelsFromMultiCrop(features, batch_size)

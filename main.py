@@ -15,6 +15,7 @@ def main():
     
     with open(command_line_args.config_path, 'r') as file:
         args = yaml.safe_load(file)
+    test_dataloader = None
     if args['task_type'] == 'o4p' or args['task_type'] == 'mp':
         train_dataloader, validate_dataloader = getVOCDataloader('..', args['batch_size'], ratio=0.01, download=False, shuffle=True)
     elif args['task_type'] == 'lp':
